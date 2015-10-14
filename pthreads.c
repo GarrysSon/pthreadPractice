@@ -1,9 +1,14 @@
 #include <stdio.h>
 #include <pthread.h>
 
-// The max size of the string buffer.
+// Defining the max size of the string buffer.
 #define BUFFER_SIZE = 60;
-char * stringBuffer[60];
+
+// Creating the character array buffer.
+char stringBuffer[60];
+
+// Creating the temporary character buffer.
+char * charBuffer;
 
 // Declaring my mutex for reading and printing characters.
 static pthread_mutex_t readCharMutex;
@@ -15,11 +20,19 @@ static pthread_mutex_t printCharMutex;
 void * sayHelloThreadTwo()
 {
 	// Locking the mutexes for reading and printing characters.
-	pthread_mutex_lock(&readCharMutex);
 	pthread_mutex_lock(&printCharMutex);
+	pthread_mutex_lock(&readCharMutex);
 
 	// Performing logic for reading characters.
 	printf("Why hello there mate! I'm thread two!\n");
+
+	// Adding the characters to the string buffer.
+	stringBuffer[0] = 'h';
+	stringBuffer[1] = 'e';
+	stringBuffer[2] = 'l';
+	stringBuffer[3] = 'l';
+	stringBuffer[4] = 'o';
+	stringBuffer[5] = '\0';
 
 	// Unlocking the mutexes for reading and printing characters.
 	pthread_mutex_unlock(&readCharMutex);
@@ -37,7 +50,8 @@ void * sayHelloThreadThree()
 	pthread_mutex_lock(&printCharMutex);
 
 	// Performing logic for writing characters.
-	printf("Why hello there mate! I'm thread three!\n");
+	printf("Why hello there mate! I'm thread three!\n\n");
+	printf("%s\n", stringBuffer);
 
 	// Unlocking the mutex for printing characters.
 	pthread_mutex_unlock(&printCharMutex);
@@ -68,14 +82,12 @@ int main(int argc, char * argv[])
 	// Perform main thread operations.
 	printf("Why hello there mate! I'm the main thread!\n");
 
-	// Unlocking the reading character mutex.
 	pthread_mutex_unlock(&readCharMutex);
 
 	// Wait for the other threads to end.
 	pthread_join(threadTwo, NULL);
 	pthread_join(threadThree, NULL);
 	
-	// Destroying the reading and printing mutexes.
 	pthread_mutex_destroy(&readCharMutex);
 	pthread_mutex_destroy(&printCharMutex);
 
