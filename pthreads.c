@@ -7,8 +7,17 @@
 // Creating the character array buffer.
 char stringBuffer[BUFFER_SIZE];
 
+// The current index within the character array buffer.
+int buffIndex = 0;
+
+// The boolean to tell if we are still reading the line of text.
+int stillReading = 0;
+
+// TEMP
+char * temp = "hello\0";
+
 // Creating the temporary character buffer.
-char * charBuffer;
+char charBuffer;
 
 // Declaring my mutex for reading and printing characters.
 static pthread_mutex_t readCharMutex;
@@ -19,23 +28,24 @@ static pthread_mutex_t printCharMutex;
 **/
 void * sayHelloThreadTwo()
 {
-	// Locking the mutexes for reading and printing characters.
+	// Locking the mutexes for printing characters.
 	pthread_mutex_lock(&printCharMutex);
-	pthread_mutex_lock(&readCharMutex);
 
-	// Performing logic for reading characters.
-	printf("Why hello there mate! I'm thread two!\n");
+	while(stillReading)
+	{
+		// Lock the mutex for reading characters.
+		pthread_mutex_lock(&readCharMutex);
 
-	// Adding the characters to the string buffer.
-	stringBuffer[0] = 'h';
-	stringBuffer[1] = 'e';
-	stringBuffer[2] = 'l';
-	stringBuffer[3] = 'l';
-	stringBuffer[4] = 'o';
-	stringBuffer[5] = '\0';
+		// Performing logic for reading characters.
+		printf("Storing character %c.\n", charBuffer);
 
-	// Unlocking the mutexes for reading and printing characters.
-	pthread_mutex_unlock(&readCharMutex);
+		// Adding the characters to the string buffer.
+		stringBuffer[buffIndex++] = charBuffer;
+
+		// Unlocking the mutexes for reading and printing characters.
+		pthread_mutex_unlock(&readCharMutex);
+	}
+
 	pthread_mutex_unlock(&printCharMutex);
 
 	return NULL;
@@ -50,8 +60,9 @@ void * sayHelloThreadThree()
 	pthread_mutex_lock(&printCharMutex);
 
 	// Performing logic for writing characters.
-	printf("Why hello there mate! I'm thread three!\n\n");
+	//printf("Why hello there mate! I'm thread three!\n\n");
 	printf("%s\n", stringBuffer);
+	buffIndex = 0;
 
 	// Unlocking the mutex for printing characters.
 	pthread_mutex_unlock(&printCharMutex);
@@ -71,6 +82,9 @@ int main(int argc, char * argv[])
 	// Locking the reading character mutex.
 	pthread_mutex_lock(&readCharMutex);
 
+	// Setting the still reading boolean to be true.
+	stillReading = 1;
+
 	// Create thread two.
 	pthread_t threadTwo;
 	pthread_create(&threadTwo, NULL, sayHelloThreadTwo, NULL);
@@ -79,10 +93,25 @@ int main(int argc, char * argv[])
 	pthread_t threadThree;
 	pthread_create(&threadThree, NULL, sayHelloThreadThree, NULL);
 
-	// Perform main thread operations.
-	printf("Why hello there mate! I'm the main thread!\n");
+	for(int i = 0; i <= 5; i++)
+	{
+		// If this is the first iteration through the loop, the mutex is already
+		// locked.
+		if(i != 0)
+		{
+			// Locking the reading character mutex.
+			pthread_mutex_lock(&readCharMutex);
+		}
 
-	pthread_mutex_unlock(&readCharMutex);
+		// Perform main thread operations.
+		printf("Added character number %d.\n", i);
+		charBuffer = temp[i];
+
+		pthread_mutex_unlock(&readCharMutex);
+	}
+
+	// Letting thread two know that we are done reading the line.
+	stillReading = 0;
 
 	// Wait for the other threads to end.
 	pthread_join(threadTwo, NULL);
@@ -90,6 +119,5 @@ int main(int argc, char * argv[])
 	
 	pthread_mutex_destroy(&readCharMutex);
 	pthread_mutex_destroy(&printCharMutex);
-
 	return 0;
 }
