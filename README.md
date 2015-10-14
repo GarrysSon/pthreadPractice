@@ -1,1 +1,3 @@
 # pthreadPractice
+
+This is to practice using pthreads in C.  It won't be very impressive, but it is mine...my own...my precious...
