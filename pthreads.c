@@ -2,10 +2,10 @@
 #include <pthread.h>
 
 // Defining the max size of the string buffer.
-#define BUFFER_SIZE = 60;
+#define BUFFER_SIZE 60
 
 // Creating the character array buffer.
-char stringBuffer[60];
+char stringBuffer[BUFFER_SIZE];
 
 // Creating the temporary character buffer.
 char * charBuffer;
