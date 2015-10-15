@@ -28,39 +28,32 @@ static pthread_mutex_t printCharMutex;
 **/
 void * sayHelloThreadTwo()
 {
-	// Iterate over the loop until the file is read.
-	//while(readingFile)
+	// Locking the mutexes for printing characters.
+	pthread_mutex_lock(&printCharMutex);
+
+	// Iterate over the loop until the line is read.
+	while(readingFile)
 	{
-		// Locking the mutexes for printing characters.
-		pthread_mutex_lock(&printCharMutex);
+		// Lock the mutex for reading characters.
+		pthread_mutex_lock(&readCharMutex);
 
-		// Iterate over the loop until the line is read.
-		while(readingFile)
+		// Performing logic for reading characters.
+		printf("Storing character %c.\n", charBuffer);
+
+		if(charBuffer == '@')
 		{
-			// Lock the mutex for reading characters.
-			pthread_mutex_lock(&readCharMutex);
-
-			// Performing logic for reading characters.
-			printf("Storing character %c.\n", charBuffer);
-
-			switch
-			if(charBuffer == '@')
-			{
-				stringBuffer[buffIndex++] = '\0';
-				pthread_mutex_unlock(&printCharMutex);
-				pthread_mutex_lock(&printCharMutex);
-			}
-			else
-			{
-				// Adding the characters to the string buffer.
-				stringBuffer[buffIndex++] = charBuffer;
-			}
-
-			// Unlocking the mutexes for reading and printing characters.
-			pthread_mutex_unlock(&readCharMutex);
+			stringBuffer[buffIndex++] = '\0';
+			pthread_mutex_unlock(&printCharMutex);
+			pthread_mutex_lock(&printCharMutex);
+		}
+		else
+		{
+			// Adding the characters to the string buffer.
+			stringBuffer[buffIndex++] = charBuffer;
 		}
 
-		
+		// Unlocking the mutexes for reading and printing characters.
+		pthread_mutex_unlock(&readCharMutex);
 	}
 
 	return NULL;
@@ -110,34 +103,22 @@ int main(int argc, char * argv[])
 	pthread_t threadThree;
 	pthread_create(&threadThree, NULL, sayHelloThreadThree, NULL);
 
-	// Print the jazz twice.
-	//for(int x = 0; x < 2; x++)
+	// Generate the line.
+	for(int i = 0; i <= 11; i++)
 	{
 		// If this is the first iteration through the loop, the mutex is already
 		// locked.
-		//if(x != 0)
+		if(i != 0)
 		{
 			// Locking the reading character mutex.
-			//pthread_mutex_lock(&readCharMutex);
+			pthread_mutex_lock(&readCharMutex);
 		}
 
-		// Generate the line.
-		for(int i = 0; i <= 11; i++)
-		{
-			// If this is the first iteration through the loop, the mutex is already
-			// locked.
-			if(i != 0)
-			{
-				// Locking the reading character mutex.
-				pthread_mutex_lock(&readCharMutex);
-			}
+		// Perform main thread operations.
+		printf("Added character number %d.\n", i);
+		charBuffer = temp[i];
 
-			// Perform main thread operations.
-			printf("Added character number %d.\n", i);
-			charBuffer = temp[i];
-
-			pthread_mutex_unlock(&readCharMutex);
-		}
+		pthread_mutex_unlock(&readCharMutex);
 	}
 
 	// Letting thread two know that we are done reading the file.
