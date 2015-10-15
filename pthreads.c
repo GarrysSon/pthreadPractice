@@ -4,6 +4,12 @@
 // Defining the max size of the string buffer.
 #define BUFFER_SIZE 60
 
+// Defining the control characters.
+#define END_OF_LINE '@'
+#define ERASE_LAST_CHAR '*'
+#define DELETE_LAST_WORD '$'
+#define CLEAR_BUFFER '&'
+
 // Creating the character array buffer.
 char stringBuffer[BUFFER_SIZE];
 
@@ -24,6 +30,21 @@ static pthread_mutex_t readCharMutex;
 static pthread_mutex_t printCharMutex;
 
 /**
+* Gets the index of the beginning of the last word.
+**/
+int GetLastWordIndex(int currentIndex)
+{
+	// Iterate over the buffer until we find a space character.
+	while(currentIndex > 0 && stringBuffer[currentIndex] != ' ')
+	{
+		currentIndex--;
+	}
+
+	// Return the found index.
+	return currentIndex;
+}
+
+/**
 * Thread two's start function.
 **/
 void * sayHelloThreadTwo()
@@ -40,19 +61,36 @@ void * sayHelloThreadTwo()
 		// Performing logic for reading characters.
 		printf("Storing character %c.\n", charBuffer);
 
-		if(charBuffer == '@')
+		// See what action should be taken based on the current character.
+		switch(charBuffer)
 		{
-			stringBuffer[buffIndex++] = '\0';
-			pthread_mutex_unlock(&printCharMutex);
-			pthread_mutex_lock(&printCharMutex);
-		}
-		else
-		{
-			// Adding the characters to the string buffer.
-			stringBuffer[buffIndex++] = charBuffer;
+			case END_OF_LINE:
+				// Print the contents of the buffer.
+				pthread_mutex_unlock(&printCharMutex);
+				pthread_mutex_lock(&printCharMutex);
+				break;
+			case ERASE_LAST_CHAR:
+				// Decrement the buffer index by one.
+				buffIndex--;
+				break;
+			case DELETE_LAST_WORD:
+				// Get the index of the beginning of the last word in the buffer.
+				buffIndex = GetLastWordIndex(buffIndex);
+				break;
+			case CLEAR_BUFFER:
+				// Reset the buffer index.
+				buffIndex = 0;
+				break;
+			default:
+				// Adding the characters to the string buffer.
+				stringBuffer[buffIndex++] = charBuffer;
+				break;
 		}
 
-		// Unlocking the mutexes for reading and printing characters.
+		// Add the NULL character to the end of the current string in the buffer.
+		stringBuffer[buffIndex] = '\0';
+
+		// Unlocking the mutex for reading characters.
 		pthread_mutex_unlock(&readCharMutex);
 	}
 
