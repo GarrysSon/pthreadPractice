@@ -10,11 +10,11 @@ char stringBuffer[BUFFER_SIZE];
 // The current index within the character array buffer.
 int buffIndex = 0;
 
-// The boolean to tell if we are still reading the line of text.
-int stillReading = 0;
+// The boolean to tell if we are still reading the file or a the line of text.
+int readingFile = 0;
 
 // TEMP
-char * temp = "hello\0";
+char * temp = "hello@Hello@";
 
 // Creating the temporary character buffer.
 char charBuffer;
@@ -28,25 +28,40 @@ static pthread_mutex_t printCharMutex;
 **/
 void * sayHelloThreadTwo()
 {
-	// Locking the mutexes for printing characters.
-	pthread_mutex_lock(&printCharMutex);
-
-	while(stillReading)
+	// Iterate over the loop until the file is read.
+	//while(readingFile)
 	{
-		// Lock the mutex for reading characters.
-		pthread_mutex_lock(&readCharMutex);
+		// Locking the mutexes for printing characters.
+		pthread_mutex_lock(&printCharMutex);
 
-		// Performing logic for reading characters.
-		printf("Storing character %c.\n", charBuffer);
+		// Iterate over the loop until the line is read.
+		while(readingFile)
+		{
+			// Lock the mutex for reading characters.
+			pthread_mutex_lock(&readCharMutex);
 
-		// Adding the characters to the string buffer.
-		stringBuffer[buffIndex++] = charBuffer;
+			// Performing logic for reading characters.
+			printf("Storing character %c.\n", charBuffer);
 
-		// Unlocking the mutexes for reading and printing characters.
-		pthread_mutex_unlock(&readCharMutex);
+			switch
+			if(charBuffer == '@')
+			{
+				stringBuffer[buffIndex++] = '\0';
+				pthread_mutex_unlock(&printCharMutex);
+				pthread_mutex_lock(&printCharMutex);
+			}
+			else
+			{
+				// Adding the characters to the string buffer.
+				stringBuffer[buffIndex++] = charBuffer;
+			}
+
+			// Unlocking the mutexes for reading and printing characters.
+			pthread_mutex_unlock(&readCharMutex);
+		}
+
+		
 	}
-
-	pthread_mutex_unlock(&printCharMutex);
 
 	return NULL;
 }
@@ -56,16 +71,18 @@ void * sayHelloThreadTwo()
 **/
 void * sayHelloThreadThree()
 {
-	// Locking the mutex for printing characters.
-	pthread_mutex_lock(&printCharMutex);
+	while(readingFile)
+	{
+		// Locking the mutex for printing characters.
+		pthread_mutex_lock(&printCharMutex);
 
-	// Performing logic for writing characters.
-	//printf("Why hello there mate! I'm thread three!\n\n");
-	printf("%s\n", stringBuffer);
-	buffIndex = 0;
+		// Performing logic for writing characters.
+		printf("%s\n", stringBuffer);
+		buffIndex = 0;
 
-	// Unlocking the mutex for printing characters.
-	pthread_mutex_unlock(&printCharMutex);
+		// Unlocking the mutex for printing characters.
+		pthread_mutex_unlock(&printCharMutex);
+	}
 
 	return NULL;
 }
@@ -82,8 +99,8 @@ int main(int argc, char * argv[])
 	// Locking the reading character mutex.
 	pthread_mutex_lock(&readCharMutex);
 
-	// Setting the still reading boolean to be true.
-	stillReading = 1;
+	// Setting the reading from file boolean to true.
+	readingFile = 1;
 
 	// Create thread two.
 	pthread_t threadTwo;
@@ -93,25 +110,38 @@ int main(int argc, char * argv[])
 	pthread_t threadThree;
 	pthread_create(&threadThree, NULL, sayHelloThreadThree, NULL);
 
-	for(int i = 0; i <= 5; i++)
+	// Print the jazz twice.
+	//for(int x = 0; x < 2; x++)
 	{
 		// If this is the first iteration through the loop, the mutex is already
 		// locked.
-		if(i != 0)
+		//if(x != 0)
 		{
 			// Locking the reading character mutex.
-			pthread_mutex_lock(&readCharMutex);
+			//pthread_mutex_lock(&readCharMutex);
 		}
 
-		// Perform main thread operations.
-		printf("Added character number %d.\n", i);
-		charBuffer = temp[i];
+		// Generate the line.
+		for(int i = 0; i <= 11; i++)
+		{
+			// If this is the first iteration through the loop, the mutex is already
+			// locked.
+			if(i != 0)
+			{
+				// Locking the reading character mutex.
+				pthread_mutex_lock(&readCharMutex);
+			}
 
-		pthread_mutex_unlock(&readCharMutex);
+			// Perform main thread operations.
+			printf("Added character number %d.\n", i);
+			charBuffer = temp[i];
+
+			pthread_mutex_unlock(&readCharMutex);
+		}
 	}
 
-	// Letting thread two know that we are done reading the line.
-	stillReading = 0;
+	// Letting thread two know that we are done reading the file.
+	readingFile = 0;
 
 	// Wait for the other threads to end.
 	pthread_join(threadTwo, NULL);
