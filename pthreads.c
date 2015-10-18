@@ -5,7 +5,7 @@
 #define BUFFER_SIZE 60
 
 // Defining the control characters.
-#define PRINT_CHAR '@'
+#define PRINT_BUFFER '@'
 #define ERASE_LAST_CHAR '*'
 #define DELETE_LAST_WORD '$'
 #define CLEAR_BUFFER '&'
@@ -24,9 +24,6 @@ int readingChar = 1;
 
 // The boolean to tell if we are printing a character, initially false.
 int printingChar = 0;
-
-// TEMP
-char * temp = "hi$hii*@How are are&How are you\nAll the best.\nthis line will @not be printed.@0";
 
 // Creating the temporary character buffer.
 char charBuffer;
@@ -74,7 +71,7 @@ void * sayHelloThreadTwo()
 		// See what action should be taken based on the current character.
 		switch(charBuffer)
 		{
-			case PRINT_CHAR:
+			case PRINT_BUFFER:
 				// Setting the printing character boolean to true.
 				printingChar++;
 
@@ -161,6 +158,20 @@ void * sayHelloThreadThree()
 **/
 int main(int argc, char * argv[])
 {
+	// The temporary character variable.
+	char temp;
+
+	// Open the file.
+	FILE * file;
+	file = fopen("hw4input.txt", "rt");
+
+	// Check that the file was successfully opened.
+	if(!file)
+	{
+		printf("The file was not found!\n");
+		return 1;
+	}
+
 	// Creating the mutex for reading, storing, and printing characters.
 	pthread_mutex_init(&mutex, NULL);
 
@@ -181,7 +192,7 @@ int main(int argc, char * argv[])
 	pthread_create(&threadThree, NULL, sayHelloThreadThree, NULL);
 
 	// Generate the line.
-	for(int i = 0; temp[i] != '0'; i++)
+	while((temp = getc(file)) != EOF)
 	{
 		// Locking on the mutex.
 		pthread_mutex_lock(&mutex);
@@ -192,8 +203,8 @@ int main(int argc, char * argv[])
 			pthread_cond_wait(&fillCharCond, &mutex);
 		}
 
-		// Perform main thread operations.
-		charBuffer = temp[i];
+		// Move the character from the temp variable to the buffer.
+		charBuffer = temp;
 
 		// Set the reading character boolean to false.
 		readingChar--;
@@ -203,11 +214,21 @@ int main(int argc, char * argv[])
 		pthread_mutex_unlock(&mutex);
 	}
 
-	// End the threads with one final character.
-	//stringBuffer[0] = '\0';
-	//charBuffer = '@';
+	// The next section is to signal the end of the operation.
+	while(!readingChar)
+	{
+		pthread_cond_wait(&fillCharCond, &mutex);
+	}
 
-	//pthread_mutex_unlock(&readCharMutex);
+	// Move the character from the temp variable to the buffer.
+	charBuffer = PRINT_BUFFER;
+
+	// Set the reading character boolean to false.
+	readingChar--;
+
+	// Signal for the character to be stored.
+	pthread_cond_signal(&storeCharCond);
+	pthread_mutex_unlock(&mutex);
 
 	// Letting thread two know that we are done reading the file.
 	readingFile = 0;
@@ -221,6 +242,8 @@ int main(int argc, char * argv[])
 	pthread_cond_destroy(&fillCharCond);
 	pthread_cond_destroy(&storeCharCond);
 	pthread_cond_destroy(&printCharCond);
+
+	fclose(file);
 
 	return 0;
 }
