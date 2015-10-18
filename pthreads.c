@@ -5,7 +5,7 @@
 #define BUFFER_SIZE 60
 
 // Defining the control characters.
-#define END_OF_LINE '@'
+#define PRINT_CHAR '@'
 #define ERASE_LAST_CHAR '*'
 #define DELETE_LAST_WORD '$'
 #define CLEAR_BUFFER '&'
@@ -19,15 +19,25 @@ int buffIndex = 0;
 // The boolean to tell if we are still reading the file or a the line of text.
 int readingFile = 0;
 
+// The boolean to tell if we are reading a character, initially true.
+int readingChar = 1;
+
+// The boolean to tell if we are printing a character, initially false.
+int printingChar = 0;
+
 // TEMP
-char * temp = "hello@Hello@";
+char * temp = "hi$hii*@How are are&How are you\nAll the best.\nthis line will @not be printed.@0";
 
 // Creating the temporary character buffer.
 char charBuffer;
 
-// Declaring my mutex for reading and printing characters.
-static pthread_mutex_t readCharMutex;
-static pthread_mutex_t printCharMutex;
+// Declaring my mutex for reading, storing, and printing characters.
+static pthread_mutex_t mutex;
+
+// Declaring my conditions for reading, storing, and printing characters.
+static pthread_cond_t fillCharCond;
+static pthread_cond_t storeCharCond;
+static pthread_cond_t printCharCond;
 
 /**
 * Gets the index of the beginning of the last word.
@@ -49,29 +59,41 @@ int GetLastWordIndex(int currentIndex)
 **/
 void * sayHelloThreadTwo()
 {
-	// Locking the mutexes for printing characters.
-	pthread_mutex_lock(&printCharMutex);
-
 	// Iterate over the loop until the line is read.
 	while(readingFile)
 	{
-		// Lock the mutex for reading characters.
-		pthread_mutex_lock(&readCharMutex);
+		// Locking on the mutex.
+		pthread_mutex_lock(&mutex);
 
-		// Performing logic for reading characters.
-		printf("Storing character %c.\n", charBuffer);
+		// Wait until it is time to print again.
+		while(readingChar)
+		{
+			pthread_cond_wait(&storeCharCond, &mutex);
+		}
 
 		// See what action should be taken based on the current character.
 		switch(charBuffer)
 		{
-			case END_OF_LINE:
+			case PRINT_CHAR:
+				// Setting the printing character boolean to true.
+				printingChar++;
+
 				// Print the contents of the buffer.
-				pthread_mutex_unlock(&printCharMutex);
-				pthread_mutex_lock(&printCharMutex);
+				pthread_cond_signal(&printCharCond);
+				pthread_mutex_unlock(&mutex);
+
+				// Wait until we are done printing the characters.
+				while(printingChar)
+				{
+					pthread_cond_wait(&printCharCond, &mutex);
+				}
 				break;
 			case ERASE_LAST_CHAR:
-				// Decrement the buffer index by one.
-				buffIndex--;
+				if(buffIndex > 0)
+				{
+					// Decrement the buffer index by one.
+					buffIndex--;
+				}
 				break;
 			case DELETE_LAST_WORD:
 				// Get the index of the beginning of the last word in the buffer.
@@ -88,10 +110,15 @@ void * sayHelloThreadTwo()
 		}
 
 		// Add the NULL character to the end of the current string in the buffer.
-		stringBuffer[buffIndex] = '\0';
+		stringBuffer[buffIndex] = '\n';
+		stringBuffer[buffIndex + 1] = '\0';
 
-		// Unlocking the mutex for reading characters.
-		pthread_mutex_unlock(&readCharMutex);
+		// Set the reading character boolean to true.
+		readingChar++;
+
+		// Signal for another character to be read.
+		pthread_cond_signal(&fillCharCond);
+		pthread_mutex_unlock(&mutex);
 	}
 
 	return NULL;
@@ -105,14 +132,25 @@ void * sayHelloThreadThree()
 	while(readingFile)
 	{
 		// Locking the mutex for printing characters.
-		pthread_mutex_lock(&printCharMutex);
+		pthread_mutex_lock(&mutex);
+
+		// Wait until it is time to print the characters.
+		while(!printingChar)
+		{
+			pthread_cond_wait(&printCharCond, &mutex);
+		}
 
 		// Performing logic for writing characters.
-		printf("%s\n", stringBuffer);
+		printf("%s", stringBuffer);
 		buffIndex = 0;
+		charBuffer = '\0';
 
-		// Unlocking the mutex for printing characters.
-		pthread_mutex_unlock(&printCharMutex);
+		// Setting the printing characters boolean to false.
+		printingChar--;
+
+		// Signal that we are done printing.
+		pthread_cond_signal(&printCharCond);
+		pthread_mutex_unlock(&mutex);
 	}
 
 	return NULL;
@@ -123,12 +161,13 @@ void * sayHelloThreadThree()
 **/
 int main(int argc, char * argv[])
 {
-	// Creating the mutex for reading in characters.
-	pthread_mutex_init(&readCharMutex, NULL);
-	pthread_mutex_init(&printCharMutex, NULL);
+	// Creating the mutex for reading, storing, and printing characters.
+	pthread_mutex_init(&mutex, NULL);
 
-	// Locking the reading character mutex.
-	pthread_mutex_lock(&readCharMutex);
+	// Creating the conditions for reading, storing, and printing characters.
+	pthread_cond_init(&fillCharCond, NULL);
+	pthread_cond_init(&storeCharCond, NULL);
+	pthread_cond_init(&printCharCond, NULL);
 
 	// Setting the reading from file boolean to true.
 	readingFile = 1;
@@ -142,22 +181,33 @@ int main(int argc, char * argv[])
 	pthread_create(&threadThree, NULL, sayHelloThreadThree, NULL);
 
 	// Generate the line.
-	for(int i = 0; i <= 11; i++)
+	for(int i = 0; temp[i] != '0'; i++)
 	{
-		// If this is the first iteration through the loop, the mutex is already
-		// locked.
-		if(i != 0)
+		// Locking on the mutex.
+		pthread_mutex_lock(&mutex);
+
+		// Wait until it is time to read a character.
+		while(!readingChar)
 		{
-			// Locking the reading character mutex.
-			pthread_mutex_lock(&readCharMutex);
+			pthread_cond_wait(&fillCharCond, &mutex);
 		}
 
 		// Perform main thread operations.
-		printf("Added character number %d.\n", i);
 		charBuffer = temp[i];
 
-		pthread_mutex_unlock(&readCharMutex);
+		// Set the reading character boolean to false.
+		readingChar--;
+
+		// Signal for the character to be stored.
+		pthread_cond_signal(&storeCharCond);
+		pthread_mutex_unlock(&mutex);
 	}
+
+	// End the threads with one final character.
+	//stringBuffer[0] = '\0';
+	//charBuffer = '@';
+
+	//pthread_mutex_unlock(&readCharMutex);
 
 	// Letting thread two know that we are done reading the file.
 	readingFile = 0;
@@ -166,7 +216,11 @@ int main(int argc, char * argv[])
 	pthread_join(threadTwo, NULL);
 	pthread_join(threadThree, NULL);
 	
-	pthread_mutex_destroy(&readCharMutex);
-	pthread_mutex_destroy(&printCharMutex);
+	// Destroying mutexes and conditions.
+	pthread_mutex_destroy(&mutex);
+	pthread_cond_destroy(&fillCharCond);
+	pthread_cond_destroy(&storeCharCond);
+	pthread_cond_destroy(&printCharCond);
+
 	return 0;
 }
